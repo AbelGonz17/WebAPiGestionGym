@@ -14,7 +14,7 @@ namespace ApiGym.Controllers
 {
     [ApiController]
     [Route("api/membresias")]
-    [Authorize]
+    [Authorize(Policy ="Administrador")]
     public class MembresiaController : ControllerBase
     {
         private readonly ApplicationDbContext context;

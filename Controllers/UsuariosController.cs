@@ -13,7 +13,7 @@ namespace ApiGym.Controllers
 {
     [ApiController]
     [Route("api/usuarios")]
-    [Authorize]
+    [Authorize(Policy = "Administrador")]
     public class UsuariosController : ControllerBase
     {
         private readonly ApplicationDbContext context;

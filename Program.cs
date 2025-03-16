@@ -1,10 +1,12 @@
 using ApiGym;
+using ApiGym.Entidades;
 using ApiGym.Servicios;
 using ApiGym.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +44,12 @@ builder.Services.AddAuthentication().AddJwtBearer(options =>
         ClockSkew = TimeSpan.Zero
     };
 
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Administrador", politica => politica.RequireClaim(ClaimTypes.Role,RolUsuario.Administrador.ToString()));
+    options.AddPolicy("Cliente", politica => politica.RequireClaim(ClaimTypes.Role, RolUsuario.Cliente.ToString()));
 });
 
 builder.Services.AddAutoMapper(typeof(AutoMapperProfile));

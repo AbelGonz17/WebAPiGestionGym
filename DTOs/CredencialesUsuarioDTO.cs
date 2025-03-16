@@ -15,7 +15,7 @@ namespace ApiGym.DTOs
         public string name { get; set; }
 
         [Required]
-        [EnumDataType(typeof(RolUsuario), ErrorMessage = "Rol inválido. Opciones válidas: Cliente, Admin.")]
+        [EnumDataType(typeof(RolUsuario), ErrorMessage = "Rol inválido. Opciones válidas: Cliente, Administrador.")]
         public RolUsuario Rol { get; set; }
     }
 }

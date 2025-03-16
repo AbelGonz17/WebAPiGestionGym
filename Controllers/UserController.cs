@@ -9,12 +9,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography.Xml;
 using System.Text;
+using System.Linq;
 
 namespace ApiGym.Controllers
 {
     [ApiController]
     [Route("api/Users")]
-    [Authorize]
+    [Authorize(Policy = "Administrador")]
     public class UserController : ControllerBase
     {
         private readonly ApplicationDbContext context;
@@ -54,7 +55,7 @@ namespace ApiGym.Controllers
 
             var usuario = new Usuario
             {
-                Id = Guid.NewGuid(),
+                Id = new Guid(user.Id),
                 Email = credencialesUsuarioDTO.Email,
                 Name = credencialesUsuarioDTO.name,
                 FechaRegistro = DateTime.UtcNow,
@@ -70,10 +71,9 @@ namespace ApiGym.Controllers
             return respuestaAutenticacion;
         }
 
-
         [HttpPost("login")]
         [AllowAnonymous]
-        public async Task<ActionResult<RespuestaAutenticacionDTO>> Login(CredencialesUsuarioDTO credencialesUsuario)
+        public async Task<ActionResult<RespuestaAutenticacionDTO>> Login(CredencialesLoginDTO credencialesUsuario)
         {
             var usuario = await userManager.FindByEmailAsync(credencialesUsuario.Email);
 
@@ -84,14 +84,98 @@ namespace ApiGym.Controllers
 
             var resultado = await signInManager.CheckPasswordSignInAsync(usuario, credencialesUsuario.Password, lockoutOnFailure:false);
 
-            if (resultado.Succeeded)
-            {
-                return await ConstruirToken(credencialesUsuario);
-            }
-            else
+            if (!resultado.Succeeded)
             {
                 return RetornarLoginIncorrecto();
             }
+
+            var claims = await userManager.GetClaimsAsync(usuario);
+            var rolClaim = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role);
+            var rol = rolClaim?.Value ?? "Cliente";
+
+            var credencialesUsuarioDTO = new CredencialesUsuarioDTO
+            {
+                Email = credencialesUsuario.Email,
+                Password = credencialesUsuario.Password,
+                name = usuario.UserName,
+                Rol = (RolUsuario)Enum.Parse(typeof(RolUsuario), rol)
+            };
+
+            return await ConstruirToken(credencialesUsuarioDTO);
+
+        }
+
+        [HttpPost("hacer-admin")]
+        public async Task<ActionResult> HacerAdmin(EditarClaimDTO editarClaimDTO)
+        {
+            var user = await userManager.FindByEmailAsync(editarClaimDTO.Email);
+            var usuario = await context.Usuario.FirstOrDefaultAsync(x => x.Email == editarClaimDTO.Email);
+            if(user == null )
+            {
+                return NotFound();
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+
+            var claimsRol = claims.Where(c => c.Type == ClaimTypes.Role).ToList();
+
+            foreach(var claim in claimsRol)
+            {
+                await userManager.RemoveClaimAsync(user, claim);
+            }
+
+            var newClaim = new Claim(ClaimTypes.Role, RolUsuario.Administrador.ToString());
+            var resultado = await userManager.AddClaimAsync(user,newClaim);
+            usuario.Rol = RolUsuario.Administrador;
+            context.Usuario.Update(usuario);
+            await context.SaveChangesAsync();
+
+            if (!resultado.Succeeded)
+            {
+                return BadRequest(resultado.Errors);
+            }
+
+            return Ok("Usuario promovido a administrador y roles anteriores eliminados");
+        }
+
+        [HttpPost("remover-admin")]
+        public async Task<ActionResult> RemoverAdmin(EditarClaimDTO editarClaimDTO)
+        {
+            var user = await userManager.FindByEmailAsync(editarClaimDTO.Email);
+            var usuario = await context.Usuario.FirstOrDefaultAsync(x => x.Email == editarClaimDTO.Email);
+
+            if (user == null || usuario == null)
+            {
+                return NotFound("Usuario no encontrado");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            var claim = claims.FirstOrDefault(c => c.Type == ClaimTypes.Role && c.Value == RolUsuario.Administrador.ToString());
+
+            if(claim == null)
+            {
+                return BadRequest("el usuario no tiene el rol de administrador");
+            }
+
+            var resultado = await userManager.RemoveClaimAsync(user, claim);       
+            if (!resultado.Succeeded)
+            {
+                return BadRequest(resultado.Errors);
+            }
+
+            var newClaim = new Claim(ClaimTypes.Role, RolUsuario.Cliente.ToString());
+            var results = await userManager.AddClaimAsync(user, newClaim);
+            if(!results.Succeeded)
+            {
+                return BadRequest(results.Errors);
+            }
+
+            usuario.Rol = RolUsuario.Cliente;
+            context.Usuario.Update(usuario);
+            await context.SaveChangesAsync();
+            
+
+            return Ok("Usuario ya no es administrador");
         }
 
         private ActionResult RetornarLoginIncorrecto()
