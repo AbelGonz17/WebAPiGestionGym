@@ -68,17 +68,18 @@ namespace ApiGym.Controllers
         }        
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<ActionResult> Post(CreacionMembresiaDTO creacionMembresiaDTO)
         {
-            var usuarioId = creacionMembresiaDTO.usuarioId;
+            var usuarioId = User.FindFirstValue("UsuarioId");
 
-            if (usuarioId == string.Empty)
+            if (string.IsNullOrEmpty(usuarioId))
             {
-                return BadRequest("El ID del usuario no es válido.");
+                return BadRequest("Usuario no autenticado");
             }
 
             var ExisteUser = await context.Usuario
-                .AnyAsync(x => x.Id.ToString() == creacionMembresiaDTO.usuarioId);
+                .AnyAsync(x => x.Id.ToString() == usuarioId);
             if (!ExisteUser)
             {
                 return BadRequest("El usuario no se encuentra en el sistema");

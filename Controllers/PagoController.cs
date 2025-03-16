@@ -5,6 +5,7 @@ using AutoMapper.QueryableExtensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace ApiGym.Controllers
 {
@@ -62,8 +63,15 @@ namespace ApiGym.Controllers
         [HttpPost]
         public async Task<ActionResult> Post(CreacionPagoDTO creacionPagoDTO)
         {
+            var usuarioId = User.FindFirstValue("UsuarioId");
+
+            if(string.IsNullOrEmpty(usuarioId))
+            {
+                return BadRequest("usario no autenticado");
+            }
+
             var membresia = await context.Membresias
-                .FirstOrDefaultAsync(x => x.usuarioId == creacionPagoDTO.usuarioId);
+                .FirstOrDefaultAsync(x => x.usuarioId == usuarioId);
 
             if(membresia == null)
             {
@@ -86,9 +94,7 @@ namespace ApiGym.Controllers
             {
                 return BadRequest("el monto ingresado es menor al precio del plan");
             }
-
-            var usuarioId = membresia.usuarioId;
-
+           
             var pago = new Pago
             {
                 usuarioId = usuarioId,
